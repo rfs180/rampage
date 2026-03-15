@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckSquare, Square, Plus, Clock, Trash2 } from "lucide-react";
+import { CheckSquare, Square, Plus, Clock, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 
 type Bucket = "today" | "week" | "backlog";
 
@@ -12,6 +12,7 @@ interface ChecklistTask {
   duration?: string;
   isDaily: boolean;
   emoji: string;
+  description?: string;
 }
 
 const bucketLabels: Record<Bucket, string> = {
@@ -83,14 +84,35 @@ function formatTime(time?: string) {
   return `${hr12}:${m.toString().padStart(2, "0")} ${ampm}`;
 }
 
+/**
+ * Converts **text** markdown bold syntax into <strong> elements.
+ * Splits on double-asterisk pairs and alternates between plain and bold segments.
+ */
+function formatBoldText(text: string): React.ReactNode {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i} className="font-semibold text-discord-primary">
+        {part}
+      </strong>
+    ) : (
+      part
+    )
+  );
+}
+
 export default function Checklist() {
   const [tasks, setTasks] = useState<ChecklistTask[]>(initialTasks);
 
   const [newLabel, setNewLabel] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [newBucket, setNewBucket] = useState<Bucket>("today");
   const [newTime, setNewTime] = useState("");
   const [newDuration, setNewDuration] = useState("Duration");
   const [newIsDaily, setNewIsDaily] = useState(true);
+
+  // Tracks which task cards have their description expanded
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     try {
@@ -127,8 +149,25 @@ export default function Checklist() {
     );
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   const deleteTask = (id: string) => {
     setTasks((prev) => prev.filter((task) => task.id !== id));
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   };
 
   const addTask = () => {
@@ -144,11 +183,13 @@ export default function Checklist() {
       duration: newDuration === "Duration" ? undefined : newDuration,
       isDaily: newIsDaily,
       emoji: "📝",
+      description: newDescription.trim() || undefined,
     };
 
     setTasks((prev) => [...prev, task]);
 
     setNewLabel("");
+    setNewDescription("");
     setNewTime("");
     setNewDuration("Duration");
   };
@@ -170,7 +211,7 @@ export default function Checklist() {
 
       {/* Add Task Form */}
       <div className="mb-6 rounded-lg bg-discord-darker border border-discord-border p-4">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <input
             type="text"
             value={newLabel}
@@ -186,6 +227,18 @@ export default function Checklist() {
           >
             Add
           </button>
+        </div>
+
+        {/* Description input */}
+        <div className="mb-3">
+          <input
+            type="text"
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addTask()}
+            placeholder="Description (optional, supports **bold**)"
+            className="w-full rounded bg-discord-input border border-discord-border px-3 py-2 text-sm text-discord-primary placeholder:text-discord-muted focus:outline-none"
+          />
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -265,77 +318,109 @@ export default function Checklist() {
                 <p className="text-xs text-discord-muted mt-2">No tasks yet.</p>
               ) : (
                 <ul className="space-y-2">
-                  {bucketTasks.map((task) => (
-                    <li
-                      key={task.id}
-                      className="flex items-start gap-2"
-                    >
-                      {/* Task card */}
-                      <button
-                        type="button"
-                        onClick={() => toggleTask(task.id)}
-                        className="flex-1 flex items-center gap-3 rounded bg-discord-input border border-discord-border px-3 py-2.5 text-left hover:bg-discord-hover transition-colors"
-                      >
-                        {/* Checkbox */}
-                        <span
-                          className={`inline-flex items-center justify-center w-7 h-7 rounded border-2 text-sm flex-shrink-0 ${
-                            task.done
-                              ? "border-discord-gold bg-discord-gold text-white"
-                              : "border-discord-muted bg-transparent text-discord-muted"
-                          }`}
-                        >
-                          {task.done ? "✓" : ""}
-                        </span>
+                  {bucketTasks.map((task) => {
+                    const isExpanded = expandedIds.has(task.id);
+                    const hasDescription = !!task.description;
 
-                        {/* Content */}
-                        <div className="flex flex-col flex-1 min-w-0">
-                          {/* Label row */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-sm">{task.emoji}</span>
-                            <span className="text-sm text-discord-muted">|</span>
+                    return (
+                      <li
+                        key={task.id}
+                        className="flex items-start gap-2"
+                      >
+                        {/* Task card */}
+                        <div className="flex-1 rounded bg-discord-input border border-discord-border overflow-hidden">
+                          {/* Main row — clicking expands; checkbox stops propagation to toggle done */}
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(task.id)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-discord-hover transition-colors"
+                          >
+                            {/* Checkbox */}
                             <span
-                              className={`text-sm font-medium ${
+                              role="checkbox"
+                              aria-checked={task.done}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTask(task.id);
+                              }}
+                              className={`inline-flex items-center justify-center w-7 h-7 rounded border-2 text-sm flex-shrink-0 cursor-pointer ${
                                 task.done
-                                  ? "line-through text-discord-muted"
-                                  : "text-discord-primary"
+                                  ? "border-discord-gold bg-discord-gold text-white"
+                                  : "border-discord-muted bg-transparent text-discord-muted"
                               }`}
                             >
-                              {task.label}
+                              {task.done ? "✓" : ""}
                             </span>
-                            {task.duration && (
-                              <span className="text-xs text-discord-muted">
-                                ({task.duration})
+
+                            {/* Content */}
+                            <div className="flex flex-col flex-1 min-w-0">
+                              {/* Label row */}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-sm">{task.emoji}</span>
+                                <span className="text-sm text-discord-muted">|</span>
+                                <span
+                                  className={`text-sm font-medium ${
+                                    task.done
+                                      ? "line-through text-discord-muted"
+                                      : "text-discord-primary"
+                                  }`}
+                                >
+                                  {formatBoldText(task.label)}
+                                </span>
+                                {task.duration && (
+                                  <span className="text-xs text-discord-muted">
+                                    ({task.duration})
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Meta info */}
+                              {(task.time || task.isDaily) && (
+                                <div className="mt-1 text-[11px] text-discord-muted">
+                                  {task.time && (
+                                    <span>Scheduled for {formatTime(task.time)} </span>
+                                  )}
+                                  {task.isDaily && (
+                                    <span className="text-emerald-400 font-medium">
+                                      Daily
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Expand chevron — only shown if description exists */}
+                            {hasDescription && (
+                              <span className="text-discord-muted flex-shrink-0">
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
                               </span>
                             )}
-                          </div>
+                          </button>
 
-                          {/* Meta info */}
-                          {(task.time || task.isDaily) && (
-                            <div className="mt-1 text-[11px] text-discord-muted">
-                              {task.time && (
-                                <span>Scheduled for {formatTime(task.time)} </span>
-                              )}
-                              {task.isDaily && (
-                                <span className="text-emerald-400 font-medium">
-                                  Daily
-                                </span>
-                              )}
+                          {/* Expandable description panel */}
+                          {hasDescription && isExpanded && (
+                            <div className="text-[11px] text-discord-muted mt-2 border-t border-discord-border pt-2 px-3 pb-2.5">
+                              {formatBoldText(task.description!)}
                             </div>
                           )}
                         </div>
-                      </button>
 
-                      {/* Delete button */}
-                      <button
-                        type="button"
-                        onClick={() => deleteTask(task.id)}
-                        className="w-8 h-8 flex items-center justify-center rounded bg-discord-input border border-discord-border text-discord-muted hover:text-red-400 hover:border-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                        aria-label="Delete task"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </li>
-                  ))}
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          onClick={() => deleteTask(task.id)}
+                          className="w-8 h-8 flex items-center justify-center rounded bg-discord-input border border-discord-border text-discord-muted hover:text-red-400 hover:border-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                          aria-label="Delete task"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>
