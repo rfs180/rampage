@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckSquare, Square, Plus, Clock, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckSquare, Square, Plus, Clock, Trash2, ChevronDown, ChevronUp, Pencil, Check, X } from "lucide-react";
 
 type Bucket = "today" | "week" | "backlog";
 
@@ -111,8 +111,14 @@ export default function Checklist() {
   const [newDuration, setNewDuration] = useState("Duration");
   const [newIsDaily, setNewIsDaily] = useState(true);
 
-  // Tracks which task cards have their description expanded
+  // Tracks which task cards have their panel expanded
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Edit mode
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editEmoji, setEditEmoji] = useState("");
+  const [editLabel, setEditLabel] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   useEffect(() => {
     try {
@@ -170,7 +176,38 @@ export default function Checklist() {
     });
   };
 
-  const addTask = () => {
+  const startEdit = (task: ChecklistTask) => {
+    // Ensure the panel is open
+    setExpandedIds((prev) => new Set(prev).add(task.id));
+    setEditingId(task.id);
+    setEditEmoji(task.emoji);
+    setEditLabel(task.label);
+    setEditDescription(task.description ?? "");
+  };
+
+  const saveEdit = (id: string) => {
+    const label = editLabel.trim();
+    if (!label) return;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              emoji: editEmoji.trim() || t.emoji,
+              label,
+              description: editDescription.trim() || undefined,
+            }
+          : t
+      )
+    );
+    setEditingId(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  
     const label = newLabel.trim();
     if (!label) return;
 
@@ -320,16 +357,14 @@ export default function Checklist() {
                 <ul className="space-y-2">
                   {bucketTasks.map((task) => {
                     const isExpanded = expandedIds.has(task.id);
-                    const hasDescription = !!task.description;
+                    const isEditing = editingId === task.id;
 
                     return (
-                      <li
-                        key={task.id}
-                        className="flex items-start gap-2"
-                      >
+                      <li key={task.id} className="flex items-start gap-2">
                         {/* Task card */}
                         <div className="flex-1 rounded bg-discord-input border border-discord-border overflow-hidden">
-                          {/* Main row — clicking expands; checkbox stops propagation to toggle done */}
+
+                          {/* ── Main row ── */}
                           <button
                             type="button"
                             onClick={() => toggleExpand(task.id)}
@@ -352,9 +387,8 @@ export default function Checklist() {
                               {task.done ? "✓" : ""}
                             </span>
 
-                            {/* Content */}
+                            {/* Label + meta */}
                             <div className="flex flex-col flex-1 min-w-0">
-                              {/* Label row */}
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-sm">{task.emoji}</span>
                                 <span className="text-sm text-discord-muted">|</span>
@@ -373,38 +407,103 @@ export default function Checklist() {
                                   </span>
                                 )}
                               </div>
-
-                              {/* Meta info */}
                               {(task.time || task.isDaily) && (
                                 <div className="mt-1 text-[11px] text-discord-muted">
                                   {task.time && (
                                     <span>Scheduled for {formatTime(task.time)} </span>
                                   )}
                                   {task.isDaily && (
-                                    <span className="text-emerald-400 font-medium">
-                                      Daily
-                                    </span>
+                                    <span className="text-emerald-400 font-medium">Daily</span>
                                   )}
                                 </div>
                               )}
                             </div>
 
-                            {/* Expand chevron — only shown if description exists */}
-                            {hasDescription && (
-                              <span className="text-discord-muted flex-shrink-0">
-                                {isExpanded ? (
-                                  <ChevronUp className="w-3.5 h-3.5" />
-                                ) : (
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                )}
-                              </span>
-                            )}
+                            {/* Chevron — always visible */}
+                            <span className="text-discord-muted flex-shrink-0">
+                              {isExpanded
+                                ? <ChevronUp className="w-3.5 h-3.5" />
+                                : <ChevronDown className="w-3.5 h-3.5" />}
+                            </span>
                           </button>
 
-                          {/* Expandable description panel */}
-                          {hasDescription && isExpanded && (
-                            <div className="text-[11px] text-discord-muted mt-2 border-t border-discord-border pt-2 px-3 pb-2.5">
-                              {formatBoldText(task.description!)}
+                          {/* ── Expanded panel ── */}
+                          {isExpanded && (
+                            <div className="border-t border-discord-border px-3 pt-3 pb-3">
+
+                              {isEditing ? (
+                                /* ── EDIT FORM ── */
+                                <div className="flex flex-col gap-2">
+                                  {/* Emoji + Label row */}
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={editEmoji}
+                                      onChange={(e) => setEditEmoji(e.target.value)}
+                                      maxLength={4}
+                                      placeholder="😎"
+                                      className="w-12 rounded bg-discord-input border border-discord-border px-2 py-2 text-sm text-center text-discord-primary placeholder:text-discord-muted focus:outline-none focus:border-discord-gold flex-shrink-0"
+                                      aria-label="Emoji"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={editLabel}
+                                      onChange={(e) => setEditLabel(e.target.value)}
+                                      onKeyDown={(e) => e.key === "Enter" && saveEdit(task.id)}
+                                      placeholder="Task label..."
+                                      className="flex-1 rounded bg-discord-input border border-discord-border px-3 py-2 text-sm text-discord-primary placeholder:text-discord-muted focus:outline-none focus:border-discord-gold min-w-0"
+                                      aria-label="Label"
+                                    />
+                                  </div>
+
+                                  {/* Description textarea */}
+                                  <textarea
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    placeholder="Description (optional, supports **bold**)"
+                                    rows={3}
+                                    className="w-full rounded bg-discord-input border border-discord-border px-3 py-2 text-sm text-discord-primary placeholder:text-discord-muted focus:outline-none focus:border-discord-gold resize-none"
+                                    aria-label="Description"
+                                  />
+
+                                  {/* Save / Cancel */}
+                                  <div className="flex gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => saveEdit(task.id)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      Save
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEdit}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-discord-input border border-discord-border text-discord-muted hover:text-discord-primary text-xs font-medium transition-colors"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* ── READ VIEW ── */
+                                <div>
+                                  {task.description && (
+                                    <p className="text-[11px] text-discord-muted mb-2">
+                                      {formatBoldText(task.description)}
+                                    </p>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => startEdit(task)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-discord-input border border-discord-border text-discord-muted hover:text-discord-primary hover:border-discord-gold text-xs font-medium transition-colors"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                    Edit
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
