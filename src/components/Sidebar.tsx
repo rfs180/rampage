@@ -57,6 +57,7 @@ export default function Sidebar({
       className={`
         z-40 w-full lg:w-[240px] bg-discord-darker border-r border-discord-border flex flex-col h-screen
         fixed top-0 left-0 transform transition-transform duration-200
+        pt-safe lg:pt-0
         ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0 lg:static
       `}
