@@ -267,9 +267,7 @@ export default function Checklist() {
           <CheckSquare className="w-5 h-5 text-discord-gold" />
           Checklist
         </h2>
-        <p className="text-xs text-discord-muted mt-1">
-          Quick control panel for your priorities. Stored locally on this device.
-        </p>
+
       </div>
 
       {/* ── Add Task Form ─────────────────────────────────────────────────────── */}
