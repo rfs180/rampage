@@ -39,6 +39,7 @@ export default function Layout() {
       "image-tools": "🎨 | Image Tools",
       "document-generator": "📝 | Document Generator",
       automation: "🤖 | Automation Scenarios",
+      "control-panel": "🎛️ | Control Panel",
     };
     return titles[activeItem] || "Dashboard";
   };
@@ -57,6 +58,8 @@ export default function Layout() {
     content = <CalendarJobs />;
   } else if (activeItem === "profile") {
   content = <UserProfile />;
+  } else if (activeItem === "control-panel") {
+    content = <ControlPanel />;
   } else {
     content = <ComingSoon />;
   }
