@@ -29,7 +29,7 @@ const menuCategories: MenuCategory[] = [
       { id: "screen-recorder", label: "📹 | Screen Recorder", isComingSoon: true },
       { id: "image-tools", label: "🎨 | Image Tools", isComingSoon: true },
       { id: "document-generator", label: "📝 | Document Generator", isComingSoon: true },
-      { id: "automation", label: "🤖 | Automation Scenarios", isComingSoon: true },
+      { id: "control-panel", label: "🎛️ | Control Panel" },
     ],
   },
 ];
