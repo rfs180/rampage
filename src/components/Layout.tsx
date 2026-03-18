@@ -8,6 +8,7 @@ import ArchitectSpeech from "./ArchitectSpeech";
 import GMChat from "./GMChat";
 import CalendarJobs from "./CalendarJobs";
 import UserProfile from "./UserProfile";
+import ControlPanel from "./ControlPanel";
 import { Menu } from "lucide-react";
 
 export default function Layout() {
